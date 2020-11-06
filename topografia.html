@@ -66,18 +66,33 @@
         const programInfo = {
             program: shaderProgram,
             attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-            vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+                vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+                vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
             },
             uniformLocations: {
-            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+                projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+                modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
             },
         };
+
+        
 
 
         // Rotina para contruir todos os buffers
         const buffers = await initBuffers(gl);
+
+        const triangleBuffers = {position: buffers.position,
+                                color: buffers.color,
+                                indices: buffers.indices,
+                                vertexCount: buffers.vertexCount,};
+        
+        const lineBuffers = {position: buffers.linePosition,
+                            color: buffers.lineColor,
+                            indices: buffers.lineIndices,
+                            vertexCount: buffers.lineVertexCount,};
+        
+        console.log(lineBuffers);
+        
 
         var then = 0;
 
@@ -87,7 +102,16 @@
             const deltaTime = now - then;
             then = now;
 
-            drawScene(gl, programInfo, buffers, deltaTime);
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);  // define cor para pintar de preto sem transparência
+            gl.clearDepth(1.0);                 // Limpa o buffer de profundidade
+            gl.enable(gl.DEPTH_TEST);           // Liga o teste de profundidade (Z-Buffer)
+
+            // Pinta todo o canvas com a cor padrão (preto)
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            drawScene(gl, programInfo, triangleBuffers, deltaTime, gl.TRIANGLES);
+            
+            drawScene(gl, programInfo, lineBuffers, deltaTime, gl.LINE_STRIP);
 
             requestAnimationFrame(render);
         }
@@ -153,24 +177,38 @@
 
 
         var data = await getData("https://raw.githubusercontent.com/lpsoares/WebGL/main/SP.pto");
-        //console.log(data);
+        var ctr = await getData("https://raw.githubusercontent.com/lpsoares/WebGL/main/SP.ctr");
+        //console.log(ctr);
         var data_list = data.split(/\s+/);
-        //console.log(data_list);
+        
+        var ctr_list = ctr.split(/\s+/);
 
         var i_z = data_list.splice(0,1);
+        var i_z = ctr_list.splice(0,1);
         
-        var lat_extr = data_list.splice(0,2);
-        var lon_extr = data_list.splice(0,2);
+        
+        var max_lat = data_list.splice(0,1);
+        var min_lat = data_list.splice(0,1);
+        var max_lon = data_list.splice(0,1);
+        var min_lon = data_list.splice(0,1);
         var n_lat = data_list.splice(0,1);
         var n_lon = data_list.splice(0,1);
         var alturas = data_list;
+
+        var n_pontos_linha = ctr_list.splice(0,1);
+        //console.log(ctr_list);
+
         var max_altura = 0
         var n_quadrados = (n_lat-1) * (n_lon-1)
+        var v_count = n_quadrados*6
+
+
+
 
         //console.log(alturas);
         
 
-        // Posições dos vértices do cubo.
+        // Posições dos vértices da geometria.
         var positions = [
             // 3 ints por 3 ints
             // CARREGAR ARQUIVO
@@ -180,13 +218,14 @@
             for(var j=0; j < n_lat; j++){ //col
                 positions.push(j);
                 positions.push(i);
-                var h = parseInt(alturas[n_lat*i+j])/170*1.5;
+                var h = parseInt(alturas[n_lat*i+j])/170*0.9;
                 positions.push(h);
                 if (h > max_altura){max_altura = h}
             }
         }
+        
 
-        //console.log(max_altura)
+        //console.log(positions)
 
         // Passe a lista de posições para o WebGL
         gl.bufferData(gl.ARRAY_BUFFER,
@@ -203,10 +242,10 @@
             if(alturas[j] == 0){colors = colors.concat([0, 0, 1, 1]);}
             else{
                 var ph = parseInt(alturas[j])/170*1.5/max_altura;
-                colors = colors.concat([1*(ph), 1*(1-ph), 0, 1]);
+                colors = colors.concat([1*(ph)*0.8, 1*(1-ph*0.5), 0, 1]);
             }
         }
-        console.log(colors)
+        //console.log(colors)
 
         for (var j = 0; j < n_quadrados; ++j) {
             const c = rosa;
@@ -243,24 +282,62 @@
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
             new Uint16Array(indices), gl.STATIC_DRAW);
 
+        //////////////// Line
+
+        var linePositions = [];
+        var lineColors = [];
+        var branco = [1, 1, 1, 1];
+        var lineIndex = [];
+
+        const lerp = (x, y, a)  => x * (1 - a) + y * a;
+        const clamp = (a, min = 0, max = 1) => Math.min(max, Math.max(min, a));
+        const invlerp = (x, y, a) => clamp((a - x) / (y - x));  
+        const range = (x1, y1, x2, y2, a) => lerp(x2, y2, invlerp(x1, y1, a));
+
+        //console.log(parseInt(alturas[n_lat*47+65]))
+        for(var k=0; k < n_pontos_linha-2; k++){
+            var j = range(min_lon, max_lon, 0, n_lon-1, ctr_list[k*2 + 0]);
+            var i = range(min_lat, max_lat, 0, n_lat-1, ctr_list[k*2 + 1]);
+            linePositions.push(j);
+            linePositions.push(i);
+            linePositions.push(alturas[n_lat*parseInt(i)+parseInt(j)]/170);
+            lineColors = lineColors.concat(lineColors);
+            lineIndex.push(k);
+        }
+        console.log(linePositions);
+
+        const linePositionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, linePositionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER,
+                        new Float32Array(linePositions),
+                        gl.STATIC_DRAW);
+
+        
+        const lineColorBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, lineColorBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lineColors), gl.STATIC_DRAW);
+
+        
+        const lineIndexBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, lineIndexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(lineIndex), gl.STATIC_DRAW);
+
         return {
             position: positionBuffer,
             color: colorBuffer,
             indices: indexBuffer,
+            vertexCount: v_count,
+            linePosition: linePositionBuffer,
+            lineColor: lineColorBuffer,
+            lineIndices: lineIndexBuffer,
+            lineVertexCount: lineIndex.length,
         };
     }
 
-    function drawScene(gl, programInfo, buffers, deltaTime) {
+    function drawScene(gl, programInfo, buffers, deltaTime, geometria) {
 
         // Atualiza o valor da rotação
         squareRotation += deltaTime;
-
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);  // define cor para pintar de preto sem transparência
-        gl.clearDepth(1.0);                 // Limpa o buffer de profundidade
-        gl.enable(gl.DEPTH_TEST);           // Liga o teste de profundidade (Z-Buffer)
-
-        // Pinta todo o canvas com a cor padrão (preto)
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         // Cria uma matriz de perspectiva com um campo de visão de 45 graus,
         // com a proporção de largura/altura correspondente ao tamanho de
@@ -294,19 +371,14 @@
                     -3.1415/2*0.4,// quantidade de radianos a se rotacionar * 0.7
                     [1, 0, 0]);       // eixo para ser girar em volta
         
-        //mat4.translate(modelViewMatrix,    // matriz de destino
-        //                modelViewMatrix,    // matriz para transladar
-        //               [-35, -20, 0]);  // translação
+        mat4.translate(modelViewMatrix,    // matriz de destino
+                        modelViewMatrix,    // matriz para transladar
+                       [-33, -24, 0]);  // translação
 
-        //mat4.rotate(projectionMatrix,  // matriz de destino
-        //            projectionMatrix,  // matriz para rotacionar
-        //            squareRotation,   // quantidade de radianos a se rotacionar
-        //            [0, 0, 1]);       // eixo para ser girar em volta
-
-        //mat4.rotate(modelViewMatrix,  // matriz de destino
-        //            modelViewMatrix,  // matriz para rotacionar
-        //            -3.1415/2,// quantidade de radianos a se rotacionar * 0.7
-        //            [1, 0, 0]);       // eixo para ser girar em volta
+        // mat4.rotate(projectionMatrix,  // matriz de destino
+        //             projectionMatrix,  // matriz para rotacionar
+        //             squareRotation*0.5,   // quantidade de radianos a se rotacionar
+        //             [0, 0, 1]);       // eixo para ser girar em volta
 
 
         // Diga ao WebGL como retirar as posições do
@@ -368,9 +440,9 @@
 
         {
             const offset = 0;
-            const vertexCount = 18330;
+            //const vertexCount = 18330;
             const type = gl.UNSIGNED_SHORT;
-            gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+            gl.drawElements(geometria, buffers.vertexCount, type, offset);
         }
 
     }
