@@ -289,22 +289,47 @@
         var branco = [1, 1, 1, 1];
         var lineIndex = [];
 
+
+        var positions = [
+            -1.0, -1.0,  0.5,
+             1.0, -1.0,  0.5,
+             1.0,  1.0,  0.5,
+            -1.0,  1.0,  0.5,
+        ];
+        var colors = [
+            1.0,  1.0,  1.0,  1.0,
+            1.0,  1.0,  1.0,  1.0,
+            1.0,  1.0,  1.0,  1.0,
+            1.0,  1.0,  1.0,  1.0,
+            ];
+        var indicess = [
+            0,  1,  2,  3,    // linha plana
+        ];
+
         const lerp = (x, y, a)  => x * (1 - a) + y * a;
         const clamp = (a, min = 0, max = 1) => Math.min(max, Math.max(min, a));
         const invlerp = (x, y, a) => clamp((a - x) / (y - x));  
         const range = (x1, y1, x2, y2, a) => lerp(x2, y2, invlerp(x1, y1, a));
 
         //console.log(parseInt(alturas[n_lat*47+65]))
-        for(var k=0; k < n_pontos_linha-2; k++){
+
+        for(var k=0; k < parseInt(n_pontos_linha); k++){
             var j = range(min_lon, max_lon, 0, n_lon-1, ctr_list[k*2 + 0]);
             var i = range(min_lat, max_lat, 0, n_lat-1, ctr_list[k*2 + 1]);
             linePositions.push(j);
             linePositions.push(i);
             linePositions.push(alturas[n_lat*parseInt(i)+parseInt(j)]/170);
-            lineColors = lineColors.concat(lineColors);
+            lineColors = lineColors.concat(1,1,1,1);
             lineIndex.push(k);
         }
-        console.log(linePositions);
+        
+        console.log(lineIndex);
+        console.log(lineColors);
+
+
+        console.log(linePositions)
+
+        
 
         const linePositionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, linePositionBuffer);
@@ -330,7 +355,7 @@
             linePosition: linePositionBuffer,
             lineColor: lineColorBuffer,
             lineIndices: lineIndexBuffer,
-            lineVertexCount: lineIndex.length,
+            lineVertexCount:lineIndex.length,
         };
     }
 
@@ -375,10 +400,10 @@
                         modelViewMatrix,    // matriz para transladar
                        [-33, -24, 0]);  // translação
 
-        // mat4.rotate(projectionMatrix,  // matriz de destino
-        //             projectionMatrix,  // matriz para rotacionar
-        //             squareRotation*0.5,   // quantidade de radianos a se rotacionar
-        //             [0, 0, 1]);       // eixo para ser girar em volta
+        mat4.rotate(projectionMatrix,  // matriz de destino
+                     projectionMatrix,  // matriz para rotacionar
+                     squareRotation*0.5,   // quantidade de radianos a se rotacionar
+                     [0, 0, 1]);       // eixo para ser girar em volta
 
 
         // Diga ao WebGL como retirar as posições do
@@ -442,6 +467,7 @@
             const offset = 0;
             //const vertexCount = 18330;
             const type = gl.UNSIGNED_SHORT;
+            
             gl.drawElements(geometria, buffers.vertexCount, type, offset);
         }
 
